@@ -1,8 +1,4 @@
 import json
-import time
-from time import sleep
-from requests import Request, Session
-from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 import pandas as pd
 import numpy as np
 # Postgres DB
@@ -27,7 +23,7 @@ def infer_schema(df):
     """
     """
     schema_dtype = list(df.infer_objects().dtypes)
-    schema_col_name = list(df.columns.str.lower())
+    schema_col_name = list(df.columns)
     tmp_dtype_to_sql = []
     for type in schema_dtype:
         if type == np.dtype('float64'):
@@ -64,45 +60,40 @@ def build_table_structure(df, schema, table):
     return create_statement  # , index_keys
 
 
-def initialize_tables_in_db(config, dct, table_schema):
+def initialize_tables_in_db(config, df, table_schema, table_name):
     """
     Initialize tables
     """
     conn = build_connection_engine(config)
     cur = conn.cursor()
-
-    for key in dct:
-        table_name = config.get("DATABASE").get("TABLES").get(key)
-        df = dct[key]
-        print(table_name)
+    cur.execute(
+        "select * from information_schema.tables where table_name=%s and table_schema = %s", (table_name, table_schema))
+    check = bool(cur.rowcount)
+    print(check)
+    if check == False:
+        print("Initializing table")
+        table_structure = build_table_structure(
+            df, table_schema, table_name)
+        # create schema if doesn't exist
         cur.execute(
-            "select * from information_schema.tables where table_name=%s and table_schema = %s", (table_name, table_schema))
-        check = bool(cur.rowcount)
-        print(check)
-        if check == False:
-            print("Initializing table")
-            table_structure = build_table_structure(
-                df, table_schema, table_name)
-            # create schema if doesn't exist
-            cur.execute(
-                f"""CREATE SCHEMA IF NOT EXISTS {table_schema} AUTHORIZATION {config.get("DATABASE").get("POSTGRES").get("USERNAME")};"""
-            )
-            # initialize table if doesn't exist
-            cur.execute(
-                f"""
-                    DROP TABLE if EXISTS {table_schema}.{table_name};
-                    {table_structure}
-                    WITH (
-                            OIDS = FALSE
-                            )
-                            TABLESPACE pg_default;
-                            ALTER TABLE {table_schema}.{table_name}
-                            OWNER to manfredi;
-                            
-                    """
-            )
-        else:
-            print('The database is already initialized')
+            f"""CREATE SCHEMA IF NOT EXISTS {table_schema} AUTHORIZATION {config.get("DATABASE").get("POSTGRES").get("USERNAME")};"""
+        )
+        # initialize table if doesn't exist
+        cur.execute(
+            f"""
+                DROP TABLE if EXISTS {table_schema}.{table_name};
+                {table_structure}
+                WITH (
+                        OIDS = FALSE
+                        )
+                        TABLESPACE pg_default;
+                        ALTER TABLE {table_schema}.{table_name}
+                        OWNER to manfredi;
+                        
+                """
+        )
+    else:
+        print('The database is already initialized')
     conn.commit()  # <--- makes sure the change is shown in the database
     conn.close()
     cur.close()
@@ -138,7 +129,7 @@ def build_connection_engine(config, type='p'):
     return conn
 
 
-def load_to_postgres(config, dct, table_schema):
+def load_to_postgres(config, df, table_schema, table_name):
     """
     This function will upload the data extracted from the MCM page from a single coin history to the table. 
     This is an iterative process, thus we will check the latest data available and append new data
@@ -150,24 +141,60 @@ def load_to_postgres(config, dct, table_schema):
     # create the list of entries that are already present at the db
     conn = build_connection_engine(config, 's')
 
-    for key in dct:
-        table_name = config.get("DATABASE").get("TABLES").get(key)
-        df = dct[key]
-        # Map the lowering function to all column names
-        df.columns = map(str.lower, df.columns)
-        print(table_name)
+    df.to_sql(name=table_name,
+              schema=table_schema,
+              con=conn,
+              if_exists='replace',
+              index=False,
+              chunksize=1000,
+              method='multi',
+              )
 
-        df.to_sql(name=table_name,
-                  schema=table_schema,
-                  con=conn,
-                  if_exists='append',
-                  index=False,
-                  chunksize=1000,
-                  method='multi',
-                  )
-
-        print('Inserted '+str(len(df))+' rows ' + "in " +
-              str(table_schema) + "." + str(table_name))
+    print('Inserted '+str(len(df))+' rows ' + "in " +
+          str(table_schema) + "." + str(table_name))
 
 
-################
+# Data validation checks
+
+def count_and_surface_duplicates(df):
+    """
+    This function takes a dataframe, check for duplication and generate a dataframe with the duplicated rows for further exploration. It leverages the function  count_and_surface_duplicates()
+
+    :param df -> pd.DataFrame of the raw data
+
+    :returns duplicates (pd.DataFrame) and the number of duplicates
+    """
+    dup_cnt = df.duplicated().sum()
+    duplicates = df.loc[df.duplicated(), :]
+
+    print(f"the dataframe has {dup_cnt} duplicated rows.'")
+
+    if dup_cnt > 0:
+        duplicates['error_type'] = 'duplicated_row_in_raw_table'
+
+    return duplicates, dup_cnt
+
+
+def transfrom_date(df, col, key_col):
+    """
+    This function is based on the analysis conducted on the table DimCustomers. It generates a new column, optimized_BirthDate which imputes the median values of the BirthDates seen in the data to try solve data corruption in those dates that have a format nn/nn/nn without an expicit year
+    """
+    tmp = []
+    for ix, row in df.iterrows():
+        if len(row[col]) > 8:
+            tmp.append(pd.to_datetime(row[col], infer_datetime_format=True))
+        else:
+            tmp.append(pd.to_datetime(
+                row[col], infer_datetime_format=True, errors='coerce'))
+
+    date_exploration = df[[key_col, col]]
+    date_exploration['tmp_date'] = tmp
+    date_exploration['year'] = date_exploration.tmp_date.dt.year
+    df[f'{col}_flag'] = np.where(df[col].str.len() > 8, 0, 1)
+
+    df[f'{col}_left'] = df[col].str[:6]
+    df[f'{col}_right'] = df[col].str[6:]
+    df[f'optimized_{col}'] = np.where(df[f'{col}_flag'] == 0,  df[col], df[f'{col}_left']+str(
+        date_exploration['year'].median())[:2]+df[f'{col}_right'])
+
+    return df

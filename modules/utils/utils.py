@@ -7,6 +7,13 @@ import psycopg2
 from sqlalchemy.sql.expression import column
 
 
+def read_raw(file_name):
+    """"""
+    sheets = pd.ExcelFile(file_name)
+    dct = pd.read_excel(sheets, sheet_name=None)
+    return dct
+
+
 def read_json(file_path):
     """
     Read json config file

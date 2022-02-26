@@ -3,6 +3,7 @@ from operator import index
 from modules.utils.utils import read_json, initialize_tables_in_db, load_to_postgres,  count_and_surface_duplicates, transfrom_date, read_raw, build_connection_engine
 from pathlib import Path
 import pandas as pd
+import numpy as np
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -31,6 +32,7 @@ for key in dct:
 
 print('Starting performing validation checks and normalization...')
 conn_s = build_connection_engine(config, 's')
+
 # 3. Perform checks on raw data and load data errors that cannot be automtically solved
 for key in dct:
 
@@ -73,24 +75,22 @@ for key in dct:
         cols = ['BirthDate', 'DateFirstPurchase']
         key_col = 'CustomerKey'
         for col in cols:
-            date_error = transfrom_date(df, col, key_col)
-        date_error = df[(date_error['BirthDate_flag'] == 1) | (date_error['DateFirstPurchase_flag'] == 1)]
-        date_error['error_type'] = 'date_inconcistency'
+            tmp_df = transfrom_date(df, col, key_col)
+        error_dump = df[(tmp_df['BirthDate_flag'] == 1) | (tmp_df['DateFirstPurchase_flag'] == 1)]
+        error_dump['error_type'] = 'date_inconcistency'
 
         
-        tmp = [dups, date_error]
+        tmp = [dups, error_dump]
         error_dump = pd.concat(tmp, axis=0, ignore_index=True)
 
         initialize_tables_in_db(config, error_dump, table_schema, logger_table)
         load_to_postgres(config, error_dump, table_schema, logger_table)
 
         # phone number transform
-        df['Phone'] = df.Phone.str.replace('(', '').str.replace(')', '').str.replace('-', '').str.replace(' ', '').astype(int)
-
+        tmp_df['Phone'] = tmp_df.Phone.str.replace('(', '').str.replace(')', '').str.replace('-', '').str.replace(' ', '').astype(int)
+        tmp_df = tmp_df[list(df.columns)]
         # create normalized table
-        df_norm = df.copy()
-        df_norm['BirthDate'] = date_error['optimized_BirthDate']
-        df_norm['DateFirstPurchase'] = date_error['optimized_DateFirstPurchase']
+        df_norm = tmp_df.copy()
         df_norm['CustomerKey'] = df_norm['CustomerKey'].astype(int)
         index_keys = """(CustomerKey)"""
         initialize_tables_in_db(config, df_norm, table_schema, normalized_table, index_keys)

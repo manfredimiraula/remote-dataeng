@@ -235,11 +235,7 @@ def transfrom_date(df, col, key_col):
     """
     tmp = []
     for ix, row in df.iterrows():
-        if len(row[col]) > 8:
-            tmp.append(pd.to_datetime(row[col], infer_datetime_format=True))
-        else:
-            tmp.append(pd.to_datetime(
-                row[col], infer_datetime_format=True, errors='coerce'))
+            tmp.append(pd.to_datetime(row[col], infer_datetime_format=True, errors='coerce'))
 
     date_exploration = df[[key_col, col]]
     date_exploration['tmp_date'] = tmp
@@ -250,5 +246,10 @@ def transfrom_date(df, col, key_col):
     df[f'{col}_right'] = df[col].str[6:]
     df[f'optimized_{col}'] = np.where(df[f'{col}_flag'] == 0,  df[col], df[f'{col}_left']+str(
         date_exploration['year'].median())[:2]+df[f'{col}_right'])
+    
+    tmp = []
+    for ix, row in df.iterrows():
+            tmp.append(pd.to_datetime(row[f'optimized_{col}'], infer_datetime_format=True))
+    df[col] = tmp
 
     return df

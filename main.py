@@ -1,7 +1,11 @@
 
+from operator import index
 from modules.utils.utils import read_json, initialize_tables_in_db, load_to_postgres,  count_and_surface_duplicates, transfrom_date, read_raw, build_connection_engine
 from pathlib import Path
 import pandas as pd
+import warnings
+
+warnings.filterwarnings("ignore")
 
 p = Path(".")
 
@@ -25,12 +29,16 @@ for key in dct:
     initialize_tables_in_db(config, df, table_schema, table_name)
     load_to_postgres(config, df, table_schema, table_name)
 
-print('Starting performing validation checks ...')
+print('Starting performing validation checks and normalization...')
 conn_s = build_connection_engine(config, 's')
 # 3. Perform checks on raw data and load data errors that cannot be automtically solved
 for key in dct:
-    table_name = config.get("DATABASE").get("TABLES").get(
+
+    # DimAccounts
+    logger_table = config.get("DATABASE").get("TABLES").get(
         key).lower()+'_corrupted_data_logger'
+    normalized_table = config.get("DATABASE").get("TABLES").get(
+        key).lower()+'_normalized'
     if key == "DimAccounts": 
         df = pd.read_sql_query(f"select * from remote.{key.lower()} ",con=conn_s)
         print(table_name)
@@ -43,14 +51,20 @@ for key in dct:
 
         tmp = [dups, data_error]
 
-        df = pd.concat(tmp, axis=0, ignore_index=True)
+        error_dump = pd.concat(tmp, axis=0, ignore_index=True)
 
-        initialize_tables_in_db(config, df, table_schema, table_name)
-        load_to_postgres(config, df, table_schema, table_name)
+        initialize_tables_in_db(config, error_dump, table_schema, logger_table)
+        load_to_postgres(config, error_dump, table_schema, logger_table)
+
+        df['AccountKey'] = df['AccountKey'].astype(int)
+        index_keys = """(AccountKey)"""
+        initialize_tables_in_db(config, df, table_schema, normalized_table, index_keys)
+        load_to_postgres(config, df, table_schema, normalized_table)
 
     if key == "DimCustomer":
         df = pd.read_sql_query(f"select * from remote.{key.lower()} ",con=conn_s)
-        print(table_name)
+        logger_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_corrupted_data_logger'
+  
         # Common error checks for all the tables
         dups, dup_cnt = count_and_surface_duplicates(df)
 
@@ -67,8 +81,8 @@ for key in dct:
         tmp = [dups, date_error]
         error_dump = pd.concat(tmp, axis=0, ignore_index=True)
 
-        initialize_tables_in_db(config, error_dump, table_schema, table_name)
-        load_to_postgres(config, error_dump, table_schema, table_name)
+        initialize_tables_in_db(config, error_dump, table_schema, logger_table)
+        load_to_postgres(config, error_dump, table_schema, logger_table)
 
         # phone number transform
         df['Phone'] = df.Phone.str.replace('(', '').str.replace(')', '').str.replace('-', '').str.replace(' ', '').astype(int)
@@ -77,14 +91,16 @@ for key in dct:
         df_norm = df.copy()
         df_norm['BirthDate'] = date_error['optimized_BirthDate']
         df_norm['DateFirstPurchase'] = date_error['optimized_DateFirstPurchase']
-        table_name = config.get("DATABASE").get("TABLES").get(
-        key).lower()+'_normalized'
-        initialize_tables_in_db(config, df_norm, table_schema, table_name)
-        load_to_postgres(config, df_norm, table_schema, table_name)
+        df_norm['CustomerKey'] = df_norm['CustomerKey'].astype(int)
+        index_keys = """(CustomerKey)"""
+        initialize_tables_in_db(config, df_norm, table_schema, normalized_table, index_keys)
+        load_to_postgres(config, df_norm, table_schema, normalized_table)
 
     if key == "DimProduct":
         df = pd.read_sql_query(f"select * from remote.{key.lower()} ",con=conn_s)
-        print(table_name)
+        logger_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_corrupted_data_logger'
+        normalized_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_normalized'
+
         # Common error checks for all the tables
         dups, dup_cnt = count_and_surface_duplicates(df)
 
@@ -96,22 +112,22 @@ for key in dct:
         tmp = [dups, dismissed_prod]
         error_dump = pd.concat(tmp, axis=0, ignore_index=True)
 
-        initialize_tables_in_db(config, error_dump, table_schema, table_name)
-        load_to_postgres(config, error_dump, table_schema, table_name)
+        initialize_tables_in_db(config, error_dump, table_schema, logger_table)
+        load_to_postgres(config, error_dump, table_schema, logger_table)
 
         # make PrimaryKey
         df[['ProductKey']] = df[['ProductKey']].astype(int)
 
         # create normalized table
         df_norm = df.copy()
-        table_name = config.get("DATABASE").get("TABLES").get(
-        key).lower()+'_normalized'
-        initialize_tables_in_db(config, df_norm, table_schema, table_name)
-        load_to_postgres(config, df_norm, table_schema, table_name)
+        index_keys = """(ProductKey)"""
+        initialize_tables_in_db(config, df_norm, table_schema, normalized_table, index_keys)
+        load_to_postgres(config, df_norm, table_schema, normalized_table)
     
     if key == "DimSalesTerritory":
         df = pd.read_sql_query(f"select * from remote.{key.lower()} ",con=conn_s)
-        print(table_name)
+        logger_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_corrupted_data_logger'
+        normalized_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_normalized'
         # Common error checks for all the tables
         dups, dup_cnt = count_and_surface_duplicates(df)
 
@@ -120,29 +136,29 @@ for key in dct:
         df = df[~ df.SalesTerritoryRegion.isna()]
         # create normalized table
         df_norm = df.copy()
-        table_name = config.get("DATABASE").get("TABLES").get(
-        key).lower()+'_normalized'
-        initialize_tables_in_db(config, df_norm, table_schema, table_name)
-        load_to_postgres(config, df_norm, table_schema, table_name)
+        index_keys = """(SalesTerritoryKey)"""
+        initialize_tables_in_db(config, df_norm, table_schema, normalized_table, index_keys)
+        load_to_postgres(config, df_norm, table_schema, normalized_table)
 
     if key == "DimScenario":
         df = pd.read_sql_query(f"select * from remote.{key.lower()} ",con=conn_s)
-        print(table_name)
+        logger_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_corrupted_data_logger'
+        normalized_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_normalized'
         # Common error checks for all the tables
         dups, dup_cnt = count_and_surface_duplicates(df)
 
         # Table specific checks generated through EDAs
-        
+
         # create normalized table
         df_norm = df.copy()
-        table_name = config.get("DATABASE").get("TABLES").get(
-        key).lower()+'_normalized'
-        initialize_tables_in_db(config, df_norm, table_schema, table_name)
-        load_to_postgres(config, df_norm, table_schema, table_name)
+        index_keys = """(ScenarioKey)"""
+        initialize_tables_in_db(config, df_norm, table_schema, normalized_table, index_keys)
+        load_to_postgres(config, df_norm, table_schema, normalized_table)
     
     if key == "FactFinance":
         df = pd.read_sql_query(f"select * from remote.{key.lower()} ",con=conn_s)
-        print(table_name)
+        logger_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_corrupted_data_logger'
+        normalized_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_normalized'
         # Common error checks for all the tables
         dups, dup_cnt = count_and_surface_duplicates(df)
 
@@ -152,14 +168,14 @@ for key in dct:
         
         # create normalized table
         df_norm = df.copy()
-        table_name = config.get("DATABASE").get("TABLES").get(
-        key).lower()+'_normalized'
-        initialize_tables_in_db(config, df_norm, table_schema, table_name)
-        load_to_postgres(config, df_norm, table_schema, table_name)
+        index_keys = """(FinanceKey)"""
+        initialize_tables_in_db(config, df_norm, table_schema, normalized_table, index_keys)
+        load_to_postgres(config, df_norm, table_schema, normalized_table)
 
     if key == "FactResellerSales":
         df = pd.read_sql_query(f"select * from remote.{key.lower()} ",con=conn_s)
-        print(table_name)
+        logger_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_corrupted_data_logger'
+        normalized_table = config.get("DATABASE").get("TABLES").get(key).lower()+'_normalized'
         # Common error checks for all the tables
         dups, dup_cnt = count_and_surface_duplicates(df)
 
@@ -169,7 +185,5 @@ for key in dct:
         
         # create normalized table
         df_norm = df.copy()
-        table_name = config.get("DATABASE").get("TABLES").get(
-        key).lower()+'_normalized'
-        initialize_tables_in_db(config, df_norm, table_schema, table_name)
-        load_to_postgres(config, df_norm, table_schema, table_name)
+        initialize_tables_in_db(config, df_norm, table_schema, normalized_table)
+        load_to_postgres(config, df_norm, table_schema, normalized_table)

@@ -8,7 +8,17 @@ from sqlalchemy.sql.expression import column
 
 
 def read_raw(file_name):
-    """"""
+    """
+    Simple function that reads an Excel file with multiple sheets, ingesting all the sheets in a dictionary of the format 
+        {
+            sheet_name: df,
+            ...
+        }
+    
+    :param xslx
+
+    return dict
+    """
     sheets = pd.ExcelFile(file_name)
     dct = pd.read_excel(sheets, sheet_name=None)
     return dct
@@ -28,6 +38,11 @@ def read_json(file_path):
 
 def infer_schema(df):
     """
+    Simple function to evaluate the datatype of dataframe columns to prepare loading into DB
+
+    :param pd.DataFrame
+
+    return schema_dtype (list of dtypes of columns) and schema_col_name (list of column name for table)
     """
     schema_dtype = list(df.infer_objects().dtypes)
     schema_col_name = list(df.columns)
@@ -63,13 +78,21 @@ def build_table_structure(df, schema, table):
         create_statement = create_statement + '\n' + \
             col_name[i] + ' ' + col_dtypes[i] + ', '
     create_statement = create_statement[:-2] + ')'
-    #index_keys = """(coin_id, name)"""
-    return create_statement  # , index_keys
+    return create_statement 
 
 
-def initialize_tables_in_db(config, df, table_schema, table_name):
+
+def initialize_tables_in_db(config, df, table_schema, table_name, index_keys = None):
     """
-    Initialize tables
+    Initialize tables for DB loading. Leverages psycopg2 library. Based on a config file, it reads the database connection string.
+
+    :param config (json) the configuration json file
+    :param  df (pd.DataFrame) the dataframe that will form the basis for the table structure
+    :param table_schema the name of the table schema
+    :param table_name the name of the table
+    :param (optional) index_keys; when loading into a normalized table, if provided with index key it will generate a basic indexing at the table level
+
+    return execute SQL creation statement
     """
     conn = build_connection_engine(config)
     cur = conn.cursor()
@@ -86,19 +109,33 @@ def initialize_tables_in_db(config, df, table_schema, table_name):
             f"""CREATE SCHEMA IF NOT EXISTS {table_schema} AUTHORIZATION {config.get("DATABASE").get("POSTGRES").get("USERNAME")};"""
         )
         # initialize table if doesn't exist
-        cur.execute(
-            f"""
-                DROP TABLE if EXISTS {table_schema}.{table_name};
-                {table_structure}
-                WITH (
-                        OIDS = FALSE
-                        )
-                        TABLESPACE pg_default;
-                        ALTER TABLE {table_schema}.{table_name}
-                        OWNER to manfredi;
-                        
-                """
-        )
+        if index_keys is not None:
+            cur.execute(
+                f"""
+                    DROP TABLE if EXISTS {table_schema}.{table_name};
+                    {table_structure}
+                    WITH (
+                            OIDS = FALSE
+                            )
+                            TABLESPACE pg_default;
+                            ALTER TABLE {table_schema}.{table_name}
+                            OWNER to manfredi;
+                            CREATE INDEX {table_name}_pkid ON {table_schema}.{table_name} {index_keys};
+                    """
+            )
+        else:
+            cur.execute(
+                f"""
+                    DROP TABLE if EXISTS {table_schema}.{table_name};
+                    {table_structure}
+                    WITH (
+                            OIDS = FALSE
+                            )
+                            TABLESPACE pg_default;
+                            ALTER TABLE {table_schema}.{table_name}
+                            OWNER to manfredi;
+                    """
+            )
     else:
         print('The database is already initialized')
     conn.commit()  # <--- makes sure the change is shown in the database
@@ -141,9 +178,12 @@ def load_to_postgres(config, df, table_schema, table_name):
     This function will upload the data extracted from the MCM page from a single coin history to the table. 
     This is an iterative process, thus we will check the latest data available and append new data
 
-    :param 
+    :param config (json) the configuration json file
+    :param  df (pd.DataFrame) the dataframe that will form the basis for the table structure
+    :param table_schema the name of the table schema
+    :param table_name the name of the table
 
-    returns
+    returns execute load into DB
     """
     # create the list of entries that are already present at the db
     conn = build_connection_engine(config, 's')
@@ -185,6 +225,13 @@ def count_and_surface_duplicates(df):
 def transfrom_date(df, col, key_col):
     """
     This function is based on the analysis conducted on the table DimCustomers. It generates a new column, optimized_BirthDate which imputes the median values of the BirthDates seen in the data to try solve data corruption in those dates that have a format nn/nn/nn without an expicit year
+
+    :param df (pd.DataFrame) the dataframe target for manipulation
+    :param col the specific column to be manipulated
+    :param key_col  the specific col at which level we aggregate 
+
+    returns the modified pd.DataFrame
+
     """
     tmp = []
     for ix, row in df.iterrows():

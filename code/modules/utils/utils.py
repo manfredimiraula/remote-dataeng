@@ -8,7 +8,13 @@ from sqlalchemy.sql.expression import column
 import sqlite3
 
 def initialize_sqllite_db(name):
-    """"""
+    """
+    Creates the connection to a local SQLite DB given a schema name. It generates the connection to this DB for further interaction. 
+
+    :param name (str) the SQLite DB schema name
+
+    return connection to DB
+    """
     sqlite3.connect(name)
     con = sqlite3.connect(name)
     
@@ -116,38 +122,11 @@ def initialize_tables_in_db(con, df, table_schema, table_name, index_keys = None
         cur.execute(f"{table_structure}")
 
 
-def build_connection_engine(config, type='p'):
-    """
-    Create the PostgresDB connection using config and return the connection object. Based on type we create a psycopg2 engine or SQLAlchemy engine 
-
-    :param -> username
-    :param -> passowrd
-    :param -> host
-    :param -> port
-    :param -> db
-
-    return psycopg2 connection object
-    """
-    username = config.get("DATABASE").get("POSTGRES").get("USERNAME")
-    password = config.get("DATABASE").get("POSTGRES").get("PASSWORD")
-    host = config.get("DATABASE").get("POSTGRES").get("HOST")
-    port = config.get("DATABASE").get("POSTGRES").get("PORT")
-    db = config.get("DATABASE").get("POSTGRES").get("DB")
-    if type == 'p':
-        conn = psycopg2.connect(database=db, user=username,
-                                password=password, host=host, port=port)
-    else:
-        conn = create_engine("sqlite://", connect_args={'timeout': 15})
-        conn = conn.connect()
-    return conn
-
-
-def load_to_postgres(con, df, table_schema, table_name):
+def load_to_db(df, table_schema, table_name):
     """
     This function will upload the data extracted from the MCM page from a single coin history to the table. 
     This is an iterative process, thus we will check the latest data available and append new data
 
-    :param config (json) the configuration json file
     :param  df (pd.DataFrame) the dataframe that will form the basis for the table structure
     :param table_schema the name of the table schema
     :param table_name the name of the table
@@ -155,7 +134,7 @@ def load_to_postgres(con, df, table_schema, table_name):
     returns execute load into DB
     """
     # create the list of entries that are already present at the db
-    engine = create_engine('sqlite:///remote.db', echo=True)
+    engine = create_engine(f'sqlite:///{table_schema}', echo=True)
     conn = engine.connect()
 
     df.to_sql(table_name, conn, if_exists='replace')

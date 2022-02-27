@@ -18,6 +18,8 @@ pip3 install -r requirements.txt
 
 echo "Bootstrapping complete"
 
+wget --no-check-certificate --output-document='Data Analyst Assignment_full.xlsx' 'https://docs.google.com/spreadsheets/d/1ksCG8l6brZWLvBxPacWmMqba396PbSlrxo1GPxMFwJ8/edit#gid=729762992&output=xlsx'
+
 echo "Running main script"
 python3 main.py
 

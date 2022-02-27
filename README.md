@@ -1,6 +1,6 @@
 # remote-dataeng
 
-The objective of this repo is to generate a pipeline that load the data from a single spreadsheet, cleanse and transform the data to handle data corruption, performs some preliminary analysis on the data and provides some useful KPIs to interpret the data (both in the form of metrics and visualizations.)
+The objective of this repo is to generate a pipeline that load the data from a single spreadsheet, cleanse and transform the data to handle data corruption, performs some preliminary analysis on the data.
 
 Lastly, using the cleansed data, I will anwer the specific questions asked.
 
@@ -24,7 +24,7 @@ I also provided the Jupyter notebooks I used to do some basic EDA on each table 
 
 I attempted to use simple technologies, given the size of the dataset and the timeframe available. The decisions made, may not be the right ones as the data grows in size and as the flow becomes more complex. Where possible, I will provide my perspective of what I think can/should be improved to scale the flow.
 
-The ingestion pipeline alone (read raw data, cleansing and loading into a SQLLite) takes ca 7min. It is a lot, given that we have few data. This is definitely a bottleneck and further iterations should increase the speed of this process using parallelization. For instance, we should think about implementing Dask or PySpark to parallelize the code and use either multiple nodes Virtual machines or cloud resources with multiple corse to speed up the ingestion as the data size scales. git
+The ingestion pipeline alone (read raw data, cleansing and loading into a SQLLite) takes ca 3min. It is a lot, given that we have few data. This is definitely a bottleneck and further iterations should increase the speed of this process using parallelization. For instance, we should think about implementing Dask or PySpark to parallelize the code and use either multiple nodes Virtual machines or cloud resources with multiple corse to speed up the ingestion as the data size scales. git
 
 The principles I'm trying to follow to create this pipeline:
 

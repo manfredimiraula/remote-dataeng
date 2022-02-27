@@ -1,5 +1,5 @@
 
-from modules.utils import read_json, initialize_tables_in_db, load_to_postgres,  count_and_surface_duplicates, transfrom_date, read_raw,  initialize_sqllite_db, report_build
+from modules.utils import read_json, initialize_tables_in_db, load_to_db,  count_and_surface_duplicates, transfrom_date, read_raw,  initialize_sqllite_db, report_build
 from pathlib import Path
 import shutil
 import os
@@ -34,7 +34,7 @@ for key in dct:
     df = dct[key]
     print(f"Initializing {table_name}, loading data if needed")
     initialize_tables_in_db(con, df, table_schema, table_name)
-    load_to_postgres(con, df, table_schema, table_name)
+    load_to_db( df, table_schema, table_name)
 
 print('Starting performing validation checks and normalization...')
 # 3. Perform checks on raw data and load data errors that cannot be automtically solved
@@ -61,13 +61,13 @@ for key in dct:
         error_dump = error_dump.drop('index', axis = 1, )
 
         initialize_tables_in_db(con, error_dump, table_schema, logger_table)
-        load_to_postgres(con, error_dump, table_schema, logger_table)
+        load_to_db( error_dump, table_schema, logger_table)
 
         df['AccountKey'] = df['AccountKey'].astype(int)
         df = df.drop('index', axis = 1, )
         index_keys = """(AccountKey)"""
         initialize_tables_in_db(con, df, table_schema, normalized_table, index_keys)
-        load_to_postgres(con, df, table_schema, normalized_table)
+        load_to_db( df, table_schema, normalized_table)
 
     if key == "DimCustomer":
         df = pd.read_sql_query(f"select * from {key.lower()} ",con=con)
@@ -90,7 +90,7 @@ for key in dct:
         error_dump = pd.concat(tmp, axis=0, ignore_index=True)
         error_dump = error_dump.drop('index', axis = 1, )
         initialize_tables_in_db(con, error_dump, table_schema, logger_table)
-        load_to_postgres(con, error_dump, table_schema, logger_table)
+        load_to_db( error_dump, table_schema, logger_table)
 
         # phone number transform
         tmp_df['Phone'] = tmp_df.Phone.str.replace('(', '').str.replace(')', '').str.replace('-', '').str.replace(' ', '').astype(int)
@@ -101,7 +101,7 @@ for key in dct:
         df_norm = df_norm.drop('index', axis = 1)
         index_keys = """(CustomerKey)"""
         initialize_tables_in_db(con, df_norm, table_schema, normalized_table, index_keys)
-        load_to_postgres(con, df_norm, table_schema, normalized_table)
+        load_to_db( df_norm, table_schema, normalized_table)
 
     if key == "DimProduct":
         df = pd.read_sql_query(f"select * from {key.lower()} ",con=con)
@@ -120,7 +120,7 @@ for key in dct:
         error_dump = pd.concat(tmp, axis=0, ignore_index=True)
         error_dump = error_dump.drop('index', axis = 1, )
         initialize_tables_in_db(con, error_dump, table_schema, logger_table)
-        load_to_postgres(con, error_dump, table_schema, logger_table)
+        load_to_db( error_dump, table_schema, logger_table)
 
         # make PrimaryKey
         df[['ProductKey']] = df[['ProductKey']].astype(int)
@@ -130,7 +130,7 @@ for key in dct:
         df_norm = df_norm.drop('index', axis = 1)
         index_keys = """(ProductKey)"""
         initialize_tables_in_db(con, df_norm, table_schema, normalized_table, index_keys)
-        load_to_postgres(con, df_norm, table_schema, normalized_table)
+        load_to_db( df_norm, table_schema, normalized_table)
     
     if key == "DimSalesTerritory":
         df = pd.read_sql_query(f"select * from {key.lower()} ",con=con)
@@ -147,7 +147,7 @@ for key in dct:
         df_norm = df_norm.drop('index', axis = 1)
         index_keys = """(SalesTerritoryKey)"""
         initialize_tables_in_db(con, df_norm, table_schema, normalized_table, index_keys)
-        load_to_postgres(con, df_norm, table_schema, normalized_table)
+        load_to_db( df_norm, table_schema, normalized_table)
 
     if key == "DimScenario":
         df = pd.read_sql_query(f"select * from {key.lower()} ",con=con)
@@ -163,7 +163,7 @@ for key in dct:
         df_norm = df_norm.drop('index', axis = 1, )
         index_keys = """(ScenarioKey)"""
         initialize_tables_in_db(con, df_norm, table_schema, normalized_table, index_keys)
-        load_to_postgres(con, df_norm, table_schema, normalized_table)
+        load_to_db( df_norm, table_schema, normalized_table)
     
     if key == "FactFinance":
         df = pd.read_sql_query(f"select * from {key.lower()} ",con=con)
@@ -181,7 +181,7 @@ for key in dct:
         df_norm = df_norm.drop('index', axis = 1)
         index_keys = """(FinanceKey)"""
         initialize_tables_in_db(con, df_norm, table_schema, normalized_table, index_keys)
-        load_to_postgres(con, df_norm, table_schema, normalized_table)
+        load_to_db( df_norm, table_schema, normalized_table)
 
     if key == "FactResellerSales":
         df = pd.read_sql_query(f"select * from {key.lower()} ",con=con)
@@ -198,10 +198,10 @@ for key in dct:
         df_norm = df.copy()
         df_norm = df_norm.drop('index', axis = 1)
         initialize_tables_in_db(con, df_norm, table_schema, normalized_table)
-        load_to_postgres(con, df_norm, table_schema, normalized_table)
+        load_to_db( df_norm, table_schema, normalized_table)
 
 
-
+# 4. Questions answered - Generate reports
     
 if not os.path.exists('reports'):
     os.makedirs('reports')
@@ -210,7 +210,7 @@ else:
     os.makedirs('reports')
 filepath = 'reports/'
 
-# Questions answered - Generate reports
+
 qa1 = """
 WITH data AS (
 SELECT 

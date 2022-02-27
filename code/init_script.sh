@@ -20,3 +20,5 @@ echo "Bootstrapping complete"
 
 echo "Running main script"
 python3 main.py
+
+echo "Pipeline done!"

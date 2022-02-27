@@ -6,7 +6,22 @@ echo "Starting bootstrapping"
 
 # installing homebrew
 echo "Installing MiniConda..."
-bash Miniconda3-latest-MacOSX-x86_64.sh
+
+echo "Enter 0 for Mac, esle any other number "
+read VAR
+
+if [[ $VAR -gt 0 ]]
+then
+  echo "Installing Linux based MiniConda"
+  wget --no-check-certificate --output-document='../Miniconda3-latest-Linux-x86_64.sh' 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh'
+  bash Miniconda3-latest-Linux-x86_64.sh
+else
+  echo "Installing MacOSX based MiniConda"
+  wget --no-check-certificate --output-document='../Miniconda3-latest-MacOSX-x86_64.sh' 'https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh'
+  bash Miniconda3-latest-MacOSX-x86_64.sh
+fi
+
+
 
 # creating conda env and activate
 conda create --name remote python=3.8 
@@ -18,7 +33,9 @@ pip3 install -r requirements.txt
 
 echo "Bootstrapping complete"
 
-wget --no-check-certificate --output-document='Data Analyst Assignment_full.xlsx' 'https://docs.google.com/spreadsheets/d/1ksCG8l6brZWLvBxPacWmMqba396PbSlrxo1GPxMFwJ8/edit#gid=729762992&output=xlsx'
+
+
+
 
 echo "Running main script"
 python3 main.py

@@ -6,7 +6,8 @@ Lastly, using the cleansed data, I will anwer the specific questions asked.
 
 # How-to
 
-I created an init-script that should bootstrap the environment and packages needed to run the main.py (please consider the code in the "code" folder as the main working prototype). This is the main script that creates the ETL pipe, the DB, and generate the plots to answer the questions. The steps to use this repo:
+I created an init-script that should bootstrap the environment and packages needed to run the main.py (please consider the code in the "code" folder as the main working prototype). This init-script assumes a Mac-Linux based machine and will ask to select your machine OS during installation.
+This is the main script that creates the ETL pipe, the DB, and generate the plots to answer the questions. The steps to use this repo:
 
 1. git clone this repo in your working directory
 2. within the Terminal use `bash Miniconda3-latest-MacOSX-x86_64.sh` to install MiniConda (you should be in the parent directory with the bash file already present)
@@ -106,3 +107,4 @@ All the validation checks are applied after we load the raw data into the DB. On
 2. The use of Pandas to load into a DB is a bottleneck as the data size scale. I propose to move to Dask or PySpark and parallelize the load and transform.
 3. Loggers to facilitate debugging but also to track the performance of the pipeline and the recording of metrics
 4. A more robust DB integration. SQLLite is simple and ok for prototyping and for proof of concepts (or to share code between colleagues, if the datum is not extensive). However, it doesn't have the power of a fully fledged DB like Postgres or SQL server. At scale, a more robust implementation should be considered. However, I decided to use this simple DB version because it comes directly with the Python installation and this means high level of portability. I thought about implementing everything in Postgres and create a dockerization environment, but it would have been an over-engineerization of the scope. However, I provide an additional folder in the repo named "postgres_proof_of_concept" where the pipeline can be executed while connecting to a Postgres DB. The config json provides an easy way to configure the DB connection if needed. This is supposed to be an example about how the pipeline can be easily converted to be used with other storage and DB. This version of the script is less curated and it is very much a proof of concept leveraging the same steps and functions used in the main pipeline.
+5. Both the Miniconda downloader and the raw data file could be loaded using a bash script or some other automation.

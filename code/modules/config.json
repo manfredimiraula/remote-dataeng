@@ -1,0 +1,14 @@
+{
+    "DATABASE": {
+        "TABLES":{
+            
+            "DimAccounts":"dimaccounts",
+            "DimCustomer":"dimcustomer", 
+            "DimProduct":"dimproduct",
+            "DimSalesTerritory":"dimsalesterritory",
+            "DimScenario":"dimscenario",
+            "FactFinance":"factfinance",
+            "FactResellerSales":"factresellersales"
+        }
+    } 
+}

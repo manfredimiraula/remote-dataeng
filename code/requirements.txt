@@ -1,0 +1,12 @@
+ipython
+virtualenv
+virtualenvwrapper
+jupyterlab 
+matplotlib==3.5.1
+seaborn
+numpy 
+pandas==1.3.4
+psycopg2==2.9.3
+python-dateutil
+SQLAlchemy==1.4.29
+openpyxl

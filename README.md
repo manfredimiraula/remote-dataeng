@@ -76,6 +76,8 @@ All the validation checks are applied after we load the raw data into the DB. On
 - I will probably create the answers to the final questions with and without these productsm just in case. I have the feeling that these products are either dismissed or not sold yet!
 - Plotting the StandardCost and the DealerPrice I notice consistency between the two. This makes sense, as I would expect that the DealerPrice is within range (but higher) than the product costs. It seems that this is the case, as the distribution seems shifted toward the right for the DealerPrice
 - I notice that ProductSubCategory can be nan. However, without additional context, I decide to leave the Nan values.
+- Exploring the "Weight" and "Size" columns. The weight column is consistent, however, there is a not-negligible amount of data points with very high weight values. In those cases, I'd recommend further exploration. For the column "Size" and "SizeRange" there is a mix of datatype as the column carries the cm values but also the more generic S-M-L values for the size. In those cases, I'd recommend to convert everything according to a standardized unit of measure.
+- There are also Nan/None values inside the columns Size and Weights. At the moment, given the context that I have, I decide not to intervene on these columns, as it doesn't seem immediate to infer the size or weights from other information on the table. I add these columns to the data_error_logger table.
 
 4. DimSalesTerritory
 

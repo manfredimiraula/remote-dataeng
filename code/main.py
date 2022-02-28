@@ -115,8 +115,11 @@ for key in dct:
         # flag potentially dismissed products
         dismissed_prod = df[(df['StartDate'].isna()) | (df['Status'].isna())]
         dismissed_prod['error_type'] = 'potentially_dismissed_prod'
+
+        size_issue = df[(df['Size'].str.contains('S|M|L|XL')) & (~df['Size'].isna())]
+        size_issue['error_type'] = 'size_inconcistency'
         
-        tmp = [dups, dismissed_prod]
+        tmp = [dups, dismissed_prod, size_issue]
         error_dump = pd.concat(tmp, axis=0, ignore_index=True)
         error_dump = error_dump.drop('index', axis = 1, )
         initialize_tables_in_db(con, error_dump, table_schema, logger_table)

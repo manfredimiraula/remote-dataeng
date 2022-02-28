@@ -10,7 +10,7 @@ I created an init-script that should bootstrap the environment and packages need
 This is the main script that creates the ETL pipe, the DB, and generate the plots to answer the questions. The steps to use this repo:
 
 1. git clone this repo in your working directory
-2. within the Terminal use `bash Miniconda3-latest-MacOSX-x86_64.sh` to install MiniConda (you should be in the parent directory with the bash file already present)
+2. within the Terminal, inside the folder code, run `bash Miniconda3-latest-MacOSX-x86_64.sh` to install MiniConda (you should be in the parent directory with the bash file already present)
 3. inside the /code folder launch `sh init-script.sh` using Terminal. This script should initialize the environment and install all the required packages. It also runs the main script directly.
 
 You probably need to answer few interactive questions in the terminal due to conda installation, however, these interactions should be minimal.
